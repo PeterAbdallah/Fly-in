@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+mazegen/__pycache__/
+.mypy_cache/
+dist/
+build/
+*.egg-info/

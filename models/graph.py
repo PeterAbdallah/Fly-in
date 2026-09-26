@@ -23,7 +23,7 @@ class Graph:
             DuplicateZoneError: If a zone with the same name already exists.
         """
         if zone.name in self.zones:
-            raise errors.DuplicateZoneError({zone.name})
+            raise errors.DuplicateZoneError(zone.name)
         self.zones[zone.name] = zone
 
     def add_connection(self, connection: Connection) -> None:
@@ -37,9 +37,11 @@ class Graph:
                 does not exist in the graph.
         """
         if connection.zone_a not in self.zones:
-            raise errors.NonExistingZoneError({connection.zone_a})
+            raise errors.NonExistingZoneError(connection.zone_a)
         if connection.zone_b not in self.zones:
-            raise errors.NonExistingZoneError({connection.zone_b})
+            raise errors.NonExistingZoneError(connection.zone_b)
+        if connection.zone_a == connection.zone_b:
+            raise errors.SameZoneConnectionError()
         self.connections.append(connection)
 
     def get_neighbors(self, zone: Zone) -> list[Connection]:
@@ -110,7 +112,7 @@ class Graph:
             DuplicateStartError: If a start zone has already been set.
         """
         if self._start:
-            raise errors.DuplicateStartError({start_zone.name})
+            raise errors.DuplicateStartError(start_zone.name)
         self._start = start_zone
 
     @end.setter
@@ -124,5 +126,5 @@ class Graph:
             DuplicateEndError: If an end zone has already been set.
         """
         if self._end:
-            raise errors.DuplicateEndError({end_zone.name})
+            raise errors.DuplicateEndError(end_zone.name)
         self._end = end_zone

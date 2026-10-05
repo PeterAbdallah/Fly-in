@@ -5,7 +5,7 @@ class Zone(ABC):
     """Abstract base class for a zone (node) in the map graph."""
 
     def __init__(self, name: str, x: int, y: int,
-                 color: str | None, max_drones: int):
+                 color: str | None = None, max_drones: int = 1):
         """Initialize the zone's shared attributes.
 
         Args:

@@ -1,5 +1,5 @@
 from models.graph import Graph
-from models.zone import Zone
+from models.zone import Zone, RestrictedZone, PriorityZone, BlockedZone
 from models.connection import Connection
 from errors import ParseError, MapError
 from typing import Any
@@ -74,6 +74,8 @@ class MapParser:
                         )
                     first_entry = False
                 self.handle_key(key, value, line_number)
+            if not self.nb_drones:
+                raise ParseError(line_number, "nb_drones is not specified")
         return ParsedMap(self.graph, self.nb_drones)
 
     def handle_key(self, key: str, value: str, line_number: int) -> None:
@@ -111,7 +113,7 @@ class MapParser:
         Raises:
             ParseError: If the entry type is unknown or its data is invalid.
         """
-        zone: Zone = self.parse_zone(key, value)
+        zone: Zone = self.parse_zone(key, value, line_number)
         try:
             self.graph.add_zone(zone)
             if key == "start_hub":
@@ -231,7 +233,7 @@ class MapParser:
         Raises:
             ParseError: If the zone declaration is invalid.
         """
-        if "[" in value:
+        if "[" in value or "]" in value:
             if (not value.endswith("]")
                     or value.count("[") != 1
                     or value.count("]") != 1):
@@ -250,7 +252,7 @@ class MapParser:
         if len(parts) != 3:
             raise ParseError(
                 line_number,
-                "Wrong zone format, usage-> (<prefix>: <name> <x> <y> [metadata-optional])"
+                "Wrong zone format!\nUsage-> (<prefix>: <name> <x> <y> [metadata-optional])"
             )
 
         name: str = parts[0]
@@ -268,37 +270,87 @@ class MapParser:
         return self.parse_zone_metadata(parts, key, meta_parts, line_number)
 
     def parse_zone_metadata(self, parts: list[str], key: str, meta_parts: list[str], line_number: int) -> Zone:
+        occurred: dict[str, bool] = {"color": False,
+                               "zone": False,
+                               "max_drones": False}
+        # DEFAULT VALUES
+        color: str | None = None
+        zone: str = "normal"
+        max_drones: int = 1
+
+        # LOOP THROUGH METADATA
         for data in meta_parts:
+            # IF THERES NO "="
             if not "=" in data:
                 raise ParseError(
                     line_number,
                     "Wrong metadata format (Usage: [color=red])")
 
             meta, meta_value = data.split("=", 1)
-            if key in ["start_hub", "end_hub"]:
-                if meta not in ["color", "max_drones"]:
+            if meta not in ["color", "max_drones", "zone"]:
+                raise ParseError(
+                    line_number,
+                    "Wrong metadata format, only 'zone', 'color', and 'max_drones' allowed")
+
+            # COLOR METADATA
+            elif meta == "color":
+                if occurred["color"]:
                     raise ParseError(
-                        line_number, "Wrong metadata format, only 'color', 'max_drones' allowed")
-                elif meta == "color":
-                    color: str = meta_value
-                elif meta == "zone":
-                    if meta_value not in ["normal", "restricted", "blocked", "priority"]:
-                        raise ParseError(
-                            line_number,
-                            "Wrong zone type.")
-                    zone_type: str = meta_value
-                elif meta == "max_drones":
-                    try:
-                        max_drones: int = int(meta_value)
-                        if max_drones <= 0:
-                            raise ValueError
-                    except ValueError:
-                        raise ParseError(
-                            line_number, "max_drones value must be a positive integer")
+                        line_number,
+                        "color metadata written twice!")
+                color = meta_value
+                occurred["color"] = True
+
+            # MAX_DRONES METADATA
+            elif meta == "max_drones":
+                if occurred["max_drones"]:
+                    raise ParseError(
+                        line_number,
+                        "max_drones metadata written twice!")
+                max_drones = self.validate_max_drones(
+                    line_number, meta_value)
+                occurred["max_drones"] = True
+
+            # ZONE METADATA
+            elif meta == "zone" and key == "hub":
+                if occurred["zone"]:
+                    raise ParseError(
+                        line_number, "zone metadata written twice!")
+                if meta_value not in ["normal", "restricted", "blocked", "priority"]:
+                    raise ParseError(
+                        line_number, "Wrong zone type.")
+                zone = meta_value
+                occurred["zone"] = True
+
+            # used zone metadata on start/end hub
             else:
-                if meta not in ["color", "zone", "max_drones"]:
-                    raise ParseError(
-                        line_number, "Wrong metadata format, only 'color', 'zone', 'max_drones' allowed")
+                raise ParseError(
+                    line_number,
+                    "'start_hub' and 'end_hub' can't have 'zone' metadata")
+        return self.create_zone(parts, zone, color, max_drones)
+
+    @staticmethod
+    def validate_max_drones(line_number: int, meta_value: str) -> int:
+        try:
+            max_drones: int = int(meta_value)
+            if max_drones <= 0:
+                raise ValueError
+            return max_drones
+        except ValueError:
+            raise ParseError(
+                line_number,
+                "max_drones value must be a positive integer")
+
+    @staticmethod
+    def create_zone(parts: list[str], zone_type: str, color: str, max_drones: int) -> Zone:
+        if zone_type == "normal":
+            return Zone(parts[0], parts[1], parts[2], color, max_drones)
+        elif zone_type == "restricted":
+            return RestrictedZone(parts[0], parts[1], parts[2], color, max_drones)
+        elif zone_type == "blocked":
+            return BlockedZone(parts[0], parts[1], parts[2], color, max_drones)
+        elif zone_type == "priority":
+            return PriorityZone(parts[0], parts[1], parts[2], color, max_drones)
 
     def parse_connection(self, line: str) -> Connection:
         """Parse a connection declaration line into a Connection instance.

@@ -1,0 +1,4 @@
+Check for missing start/end hub\
+Fix create_zone taking parts[1] parts[2]
+start/end can take all metadata
+no 2 zones can have same coordinates

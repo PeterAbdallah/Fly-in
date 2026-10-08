@@ -1,7 +1,8 @@
 from models.graph import Graph
-from models.zone import Zone, RestrictedZone, PriorityZone, BlockedZone
+from models.zone import Zone, NormalZone, RestrictedZone, PriorityZone, BlockedZone
 from models.connection import Connection
-from errors import ParseError, MapError
+from parser.errors import ParseError, MapError
+import re
 
 
 class ParsedMap:
@@ -113,36 +114,12 @@ class MapParser:
             ParseError: If the zone is invalid, has duplicate coordinates, or cannot be added to the graph.
         """
         zone: Zone = self.parse_zone(key, value, line_number)
-        # check if coordinates already exist
-        for existing_zone in self.graph.zones.values():
-            if existing_zone.x == zone.x and existing_zone.y == zone.y:
-                raise ParseError(
-                    line_number,
-                    "Two zones cannot have the same coordinates.")
         try:
             self.graph.add_zone(zone)
             if key == "start_hub":
                 self.set_start(zone, line_number)
             elif key == "end_hub":
                 self.set_end(zone, line_number)
-        except MapError as e:
-            raise ParseError(line_number, str(e)) from e
-
-    def handle_connection(self, value: str, line_number: int) -> None:
-        """Parse and add a connection to the graph.
-
-        Args:
-            value: Connection data containing the zone names and optional
-                metadata.
-            line_number: Line number of the connection declaration.
-
-        Raises:
-            ParseError: If the connection is invalid or cannot be added
-                to the graph.
-        """
-        conn: Connection = self.parse_connection(value, line_number)
-        try:
-            self.graph.add_connection(conn)
         except MapError as e:
             raise ParseError(line_number, str(e)) from e
 
@@ -239,22 +216,25 @@ class MapParser:
         Raises:
             ParseError: If the zone format, name, coordinates, or metadata is invalid.
         """
-        if "[" in value or "]" in value:
-            if (not value.endswith("]")
-                    or value.count("[") != 1
-                    or value.count("]") != 1):
-                raise ParseError(
-                    line_number,
-                    "Wrong zone format, usage->  (<prefix>: <name> <x> <y> [metadata-optional])"
-                )
-            zone_data, meta_line = value.split("[", 1)
-            parts: list[str] = zone_data.split()
-            meta_line: str = meta_line.rstrip("]")
-            if not meta_line.strip():
-                raise ParseError(line_number, "Metadata cannot be empty.")
+        match: re.Match[str] | None = re.fullmatch(
+            r"([^\[\]]+)(?:\[([^\[\]]+)\])?",
+            value
+        )
+
+        if not match:
+            raise ParseError(
+                line_number,
+                "Wrong zone format, usage->  (<prefix>: <name> <x> <y> [metadata-optional])"
+            )
+
+        zone_data: str = match.group(1)
+        meta_line: str | None = match.group(2)
+
+        parts: list[str] = zone_data.split()
+
+        if meta_line is not None:
             meta_parts: list[str] = meta_line.split()
         else:
-            parts = value.split()
             meta_parts: list[str] = list()
 
         if len(parts) != 3:
@@ -274,7 +254,7 @@ class MapParser:
             raise ParseError(line_number, "Coordinates must be integers.")
 
         if not meta_parts:
-            return Zone(name, x, y)
+            return NormalZone(name, x, y)
 
         zone, color, max_drones = self.parse_zone_metadata(
             key, meta_parts, line_number)
@@ -306,7 +286,7 @@ class MapParser:
         # LOOP THROUGH METADATA
         for data in meta_parts:
             # IF THERES NO "="
-            if not "=" in data:
+            if data.count("=") != 1:
                 raise ParseError(
                     line_number,
                     "Wrong metadata format (Usage: [color=red])")
@@ -397,7 +377,7 @@ class MapParser:
             ParseError: If the zone type is invalid.
         """
         if zone_type == "normal":
-            return Zone(name, x, y, color, max_drones)
+            return NormalZone(name, x, y, color, max_drones)
         elif zone_type == "restricted":
             return RestrictedZone(name, x, y, color, max_drones)
         elif zone_type == "blocked":
@@ -407,17 +387,102 @@ class MapParser:
         else:
             raise ParseError(0, "Wrong zone type")
 
-    def parse_connection(self, line: str, line_number: int) -> Connection:
+    def handle_connection(self, value: str, line_number: int) -> None:
+        """Parse and add a connection to the graph.
+
+        Args:
+            value: Connection data containing the zone names and optional
+                metadata.
+            line_number: Line number of the connection declaration.
+
+        Raises:
+            ParseError: If the connection is invalid or cannot be added
+                to the graph.
+        """
+        conn: Connection = self.parse_connection(value, line_number)
+        try:
+            self.graph.add_connection(conn)
+        except MapError as e:
+            raise ParseError(line_number, str(e)) from e
+
+    def parse_connection(self, value: str, line_number: int) -> Connection:
         """Parse a connection declaration line into a Connection instance.
 
         Args:
-            line: The remainder of the line after the `connection:` keyword,
-                containing the two zone names and optional metadata.
+            value: The connection data containing the two zone names and
+                optional metadata.
+            line_number: The line number of the connection declaration.
 
         Returns:
-            The constructed Connection.
+            The constructed Connection instance.
 
         Raises:
-            ParseError: If the connection format, zone names, or metadata is invalid.
+            ParseError: If the connection format or metadata is invalid.
         """
-        pass
+        match: re.Match[str] | None = re.fullmatch(
+            r"([^\[\]]+)(?:\[([^\[\]]+)\])?",
+            value
+        )
+
+        if not match:
+            raise ParseError(
+                line_number,
+                "Wrong zone format, usage->  (<prefix>: <zone_a>-<zone_b> [metadata-optional])"
+            )
+
+        data: str = match.group(1)
+        meta_line: str | None = match.group(2)
+
+        if data.count("-") != 1:
+            raise ParseError(
+                line_number,
+                "Wrong format! Usage -> Connection: <name1>-<name2> [metadata-optional]")
+        zone_a, zone_b = (part.strip() for part in data.split("-"))
+
+        if meta_line is not None:
+            meta_parts: list[str] = meta_line.split()
+            if len(meta_parts) != 1:
+                raise ParseError(
+                    line_number,
+                    "Metadata can only contain 'max_link_capacity'.")
+        else:
+            meta_parts: list[str] = list()
+
+        max_link_capacity: int = self.parse_connection_metadata(
+            meta_parts, line_number)
+        return Connection(zone_a, zone_b, max_link_capacity)
+
+    def parse_connection_metadata(self, meta_parts: list[str], line_number: int) -> int:
+        """Parse the metadata of a connection.
+
+        Args:
+            meta_parts: The metadata fields extracted from the connection.
+            line_number: The line number of the connection declaration.
+
+        Returns:
+            The maximum number of drones allowed on the connection.
+
+        Raises:
+            ParseError: If the metadata format is invalid or the link capacity
+                is not a positive integer.
+        """
+        if not meta_parts:
+            return 1
+        if meta_parts[0].count("=") != 1:
+            raise ParseError(
+                line_number,
+                "Wrong metadata format (Usage: [max_link_capacity=5])")
+        key, capacity = meta_parts[0].split("=")
+        if key != "max_link_capacity":
+            raise ParseError(
+                line_number,
+                "Wrong metadata format (Usage: [max_link_capacity=5])")
+        try:
+            max_link_capacity: int = int(capacity)
+            if max_link_capacity <= 0:
+                raise ValueError
+        except ValueError:
+            raise ParseError(
+                line_number,
+                "Link capacity must be a positive integer!")
+        return max_link_capacity

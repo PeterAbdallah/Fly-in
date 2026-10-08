@@ -18,17 +18,17 @@ class MapError(Exception):
     Parser catches this and re-raises as ParseError with the line number."""
     pass
 
+
 class DuplicateZoneError(MapError):
     """Raised when a zone name is defined more than once."""
 
-    def __init__(self, zoneName: str) -> None:
+    def __init__(self) -> None:
         """Initialize the error with the duplicated zone name.
 
         Args:
             zoneName: The name of the zone that was already defined.
         """
-        self.zoneName = zoneName
-        super().__init__(f"Duplicate zone name: {zoneName}")
+        super().__init__(f"Duplicate zone (name or coordinate)")
         # This will be the message in the ParseError
 
 
@@ -81,3 +81,11 @@ class SameZoneConnectionError(MapError):
     def __init__(self) -> None:
         """Initialize the error with a fixed, descriptive message."""
         super().__init__(f"A zone cannot be connected to itself!")
+
+
+class DuplicateConnectionError(MapError):
+    """Raised when a connection is duplicated."""
+
+    def __init__(self) -> None:
+        """Initialize the error with a fixed, descriptive message."""
+        super().__init__(f"A connection like this already exists.")

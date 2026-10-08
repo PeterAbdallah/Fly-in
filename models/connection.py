@@ -4,7 +4,7 @@ from models.zone import Zone
 class Connection():
     """Represent a bidirectional connection (edge) between two zones."""
 
-    def __init__(self, zone_a: Zone, zone_b: Zone, max_capacity: int):
+    def __init__(self, zone_a: Zone, zone_b: Zone, max_link_capacity: int):
         """Initialize the connection between two zones.
 
         Args:
@@ -15,4 +15,4 @@ class Connection():
         """
         self.zone_a = zone_a
         self.zone_b = zone_b
-        self.max_capacity = max_capacity
+        self.max_link_capacity = max_link_capacity

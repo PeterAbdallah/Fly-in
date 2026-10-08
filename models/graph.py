@@ -23,7 +23,10 @@ class Graph:
             DuplicateZoneError: If a zone with the same name already exists.
         """
         if zone.name in self.zones:
-            raise errors.DuplicateZoneError(zone.name)
+            raise errors.DuplicateZoneError()
+        for existing_zone in self.zones.values():
+            if existing_zone.x == zone.x and existing_zone.y == zone.y:
+                raise errors.DuplicateZoneError()
         self.zones[zone.name] = zone
 
     def add_connection(self, connection: Connection) -> None:
@@ -33,8 +36,9 @@ class Graph:
             connection: The connection to add.
 
         Raises:
-            NonExistingZoneError: If either zone in the connection
-                does not exist in the graph.
+            NonExistingZoneError: If either zone does not exist in the graph.
+            SameZoneConnectionError: If the connection links a zone to itself.
+            DuplicateConnectionError: If an equivalent connection already exists.
         """
         if connection.zone_a not in self.zones:
             raise errors.NonExistingZoneError(connection.zone_a)
@@ -42,6 +46,15 @@ class Graph:
             raise errors.NonExistingZoneError(connection.zone_b)
         if connection.zone_a == connection.zone_b:
             raise errors.SameZoneConnectionError()
+        for existing in self.connections:
+            if (
+                (existing.zone_a == connection.zone_a
+                 and existing.zone_b == connection.zone_b)
+                or
+                (existing.zone_a == connection.zone_b
+                 and existing.zone_b == connection.zone_a)
+            ):
+                raise errors.DuplicateConnectionError()
         self.connections.append(connection)
 
     def get_neighbors(self, zone: Zone) -> list[Connection]:
@@ -74,7 +87,7 @@ class Graph:
         return self.zones[name]
 
     @property
-    def start(self) -> Zone:
+    def start(self) -> Zone | None:
         """Return the start zone.
 
         Returns:
@@ -83,12 +96,10 @@ class Graph:
         Raises:
             ValueError: If no start zone has been set.
         """
-        if self._start is None:
-            raise ValueError("No start zone")
         return self._start
 
     @property
-    def end(self) -> Zone:
+    def end(self) -> Zone | None:
         """Return the end zone.
 
         Returns:
@@ -97,8 +108,6 @@ class Graph:
         Raises:
             ValueError: If no end zone has been set.
         """
-        if self._end is None:
-            raise ValueError("No end zone")
         return self._end
 
     @start.setter

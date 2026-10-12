@@ -36,16 +36,8 @@ class Graph:
             connection: The connection to add.
 
         Raises:
-            NonExistingZoneError: If either zone does not exist in the graph.
-            SameZoneConnectionError: If the connection links a zone to itself.
             DuplicateConnectionError: If an equivalent connection already exists.
         """
-        if connection.zone_a not in self.zones:
-            raise errors.NonExistingZoneError(connection.zone_a)
-        if connection.zone_b not in self.zones:
-            raise errors.NonExistingZoneError(connection.zone_b)
-        if connection.zone_a == connection.zone_b:
-            raise errors.SameZoneConnectionError()
         for existing in self.connections:
             if (
                 (existing.zone_a == connection.zone_a

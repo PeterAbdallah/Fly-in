@@ -45,41 +45,48 @@ class MapParser:
             ParseError: If the file is empty, missing required entries,
                 or contains an invalid entry.
         """
-        with open(self.filename, "r") as f:
-            first_entry: bool = True
-            # HANDLE EMPTY FILE
-            content: list[str] = f.readlines()
-            if not content:
-                raise ParseError(0, "Empty file!")
+        try:
+            with open(self.filename, "r") as f:
+                first_entry: bool = True
+                # HANDLE EMPTY FILE
+                content: list[str] = f.readlines()
+                if not content:
+                    raise ParseError(0, "Empty file!")
 
-            # READ LINE BY LINE
-            for line_number, line in enumerate(content, start=1):
-                line = line.strip()
+                # READ LINE BY LINE
+                for line_number, line in enumerate(content, start=1):
+                    # Strip comments and surrounding whitespace
+                    line = line.split("#")[0].strip()
 
-                # IF EMPTY, COMMENTED OR MALFORMED LINE
-                if not line or line.startswith("#"):
-                    continue
-                if ":" not in line:
-                    raise ParseError(line_number, f"Malformed line: '{line}'")
-
-                key, value = line.split(":", 1)
-                key = key.strip()
-                value = value.strip()
-
-                # CHECK IF ITS FIRST LINE
-                if first_entry:
-                    if key != "nb_drones":
+                    # Skip empty lines or comment-only lines
+                    if not line:
+                        continue
+                    if ":" not in line:
                         raise ParseError(
-                            line_number,
-                            "'Nb_drones' must be the first entry."
-                        )
-                    first_entry = False
-                self.handle_key(key, value, line_number)
-            if self.nb_drones is None:
-                raise ParseError(0, "nb_drones is not specified")
-            if self.graph.start is None or self.graph.end is None:
-                raise ParseError(0, "Start/End not specified")
-        return ParsedMap(self.graph, self.nb_drones)
+                            line_number, f"Malformed line: '{line}'")
+
+                    key, value = line.split(":", 1)
+                    key = key.strip()
+                    value = value.strip()
+
+                    # CHECK IF ITS FIRST LINE
+                    if first_entry:
+                        if key != "nb_drones":
+                            raise ParseError(
+                                line_number,
+                                "'Nb_drones' must be the first entry."
+                            )
+                        first_entry = False
+                    self.handle_key(key, value, line_number)
+                if self.nb_drones is None:
+                    raise ParseError(0, "nb_drones is not specified")
+                if self.graph.start is None:
+                    raise ParseError(0, "Start_hub not specified")
+                if self.graph.end is None:
+                    raise ParseError(0, "End_hub not specified")
+            return ParsedMap(self.graph, self.nb_drones)
+        except (FileNotFoundError, PermissionError) as e:
+            raise ParseError(0, str(e))
 
     def handle_key(self, key: str, value: str, line_number: int) -> None:
         """Handle a map entry according to its key.
@@ -448,9 +455,19 @@ class MapParser:
         else:
             meta_parts: list[str] = list()
 
+        if zone_a not in self.graph.zones or zone_b not in self.graph.zones:
+            raise ParseError(
+                line_number,
+                "Zone does not exist.")
+        if zone_a == zone_b:
+            raise ParseError(
+                line_number,
+                "Cannot connect a zone to itself.")
+        zone_a_obj = self.graph.get_zone(zone_a)
+        zone_b_obj = self.graph.get_zone(zone_b)
         max_link_capacity: int = self.parse_connection_metadata(
             meta_parts, line_number)
-        return Connection(zone_a, zone_b, max_link_capacity)
+        return Connection(zone_a_obj, zone_b_obj, max_link_capacity)
 
     def parse_connection_metadata(self, meta_parts: list[str], line_number: int) -> int:
         """Parse the metadata of a connection.

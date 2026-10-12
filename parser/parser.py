@@ -1,5 +1,6 @@
 from models.graph import Graph
-from models.zone import Zone, NormalZone, RestrictedZone, PriorityZone, BlockedZone
+from models.zone import (Zone, NormalZone,
+                         RestrictedZone, PriorityZone, BlockedZone)
 from models.connection import Connection
 from parser.errors import ParseError, MapError
 import re
@@ -85,7 +86,7 @@ class MapParser:
                 if self.graph.end is None:
                     raise ParseError(0, "End_hub not specified")
             return ParsedMap(self.graph, self.nb_drones)
-        except (FileNotFoundError, PermissionError) as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             raise ParseError(0, str(e))
 
     def handle_key(self, key: str, value: str, line_number: int) -> None:
@@ -118,7 +119,8 @@ class MapParser:
             line_number (int): in case of errors
 
         Raises:
-            ParseError: If the zone is invalid, has duplicate coordinates, or cannot be added to the graph.
+            ParseError: If the zone is invalid, has
+            duplicate coordinates, or cannot be added to the graph.
         """
         zone: Zone = self.parse_zone(key, value, line_number)
         try:
@@ -191,7 +193,8 @@ class MapParser:
             line_number (int): line n8umber in case of error
 
         Raises:
-            ParseError: If the value is not a positive integer or was already defined.
+            ParseError: If the value is not a positive
+            integer or was already defined.
         """
         if self.nb_drones is not None:
             raise ParseError(
@@ -221,7 +224,8 @@ class MapParser:
             The constructed Zone.
 
         Raises:
-            ParseError: If the zone format, name, coordinates, or metadata is invalid.
+            ParseError: If the zone format, name,
+            coordinates, or metadata is invalid.
         """
         match: re.Match[str] | None = re.fullmatch(
             r"([^\[\]]+)(?:\[([^\[\]]+)\])?",
@@ -231,7 +235,8 @@ class MapParser:
         if not match:
             raise ParseError(
                 line_number,
-                "Wrong zone format, usage->  (<prefix>: <name> <x> <y> [metadata-optional])"
+                "Wrong zone format, usage->\
+ (<prefix>: <name> <x> <y> [metadata-optional])"
             )
 
         zone_data: str = match.group(1)
@@ -247,7 +252,8 @@ class MapParser:
         if len(parts) != 3:
             raise ParseError(
                 line_number,
-                "Wrong zone format!\nUsage-> (<prefix>: <name> <x> <y> [metadata-optional])"
+                "Wrong zone format!\nUsage->\
+ (<prefix>: <name> <x> <y> [metadata-optional])"
             )
 
         name: str = parts[0]
@@ -267,7 +273,8 @@ class MapParser:
             key, meta_parts, line_number)
         return self.create_zone(name, x, y, zone, color, max_drones)
 
-    def parse_zone_metadata(self, key: str, meta_parts: list[str], line_number: int) -> tuple[str, str | None, int]:
+    def parse_zone_metadata(self, key: str, meta_parts: list[str],
+                            line_number: int) -> tuple[str, str | None, int]:
         """Parse and validate zone metadata.
 
         Args:
@@ -280,7 +287,8 @@ class MapParser:
             of drones.
 
         Raises:
-            ParseError: If metadata is invalid, duplicated, missing a value, or specifies an invalid zone type.
+            ParseError: If metadata is invalid, duplicated,
+            missing a value, or specifies an invalid zone type.
         """
         occurred: dict[str, bool] = {"color": False,
                                      "zone": False,
@@ -304,7 +312,8 @@ class MapParser:
             if meta not in ["color", "max_drones", "zone"]:
                 raise ParseError(
                     line_number,
-                    "Wrong metadata format, only 'zone', 'color', and 'max_drones' allowed")
+                    "Wrong metadata format, only 'zone', 'color',\
+ and 'max_drones' allowed")
 
             # COLOR METADATA
             elif meta == "color":
@@ -313,6 +322,8 @@ class MapParser:
                         line_number,
                         "color metadata written twice!")
                 color = meta_value
+                if not color.isalpha():
+                    raise ParseError(line_number, f"Invalid color: '{color}'")
                 occurred["color"] = True
 
             # MAX_DRONES METADATA
@@ -330,7 +341,8 @@ class MapParser:
                 if occurred["zone"]:
                     raise ParseError(
                         line_number, "zone metadata written twice!")
-                if meta_value not in ["normal", "restricted", "blocked", "priority"]:
+                if meta_value not in ["normal", "restricted",
+                                      "blocked", "priority"]:
                     raise ParseError(
                         line_number, "Wrong zone type.")
                 zone = meta_value
@@ -366,7 +378,8 @@ class MapParser:
                 "max_drones value must be a positive integer")
 
     @staticmethod
-    def create_zone(name: str, x: int, y: int, zone_type: str, color: str | None, max_drones: int) -> Zone:
+    def create_zone(name: str, x: int, y: int, zone_type: str,
+                    color: str | None, max_drones: int) -> Zone:
         """Create the appropriate zone instance from its type.
 
         Args:
@@ -434,7 +447,8 @@ class MapParser:
         if not match:
             raise ParseError(
                 line_number,
-                "Wrong zone format, usage->  (<prefix>: <zone_a>-<zone_b> [metadata-optional])"
+                "Wrong zone format, usage->\
+ (<prefix>: <zone_a>-<zone_b> [metadata-optional])"
             )
 
         data: str = match.group(1)
@@ -443,7 +457,8 @@ class MapParser:
         if data.count("-") != 1:
             raise ParseError(
                 line_number,
-                "Wrong format! Usage -> Connection: <name1>-<name2> [metadata-optional]")
+                "Wrong format! Usage ->\
+ Connection: <name1>-<name2> [metadata-optional]")
         zone_a, zone_b = (part.strip() for part in data.split("-"))
 
         if meta_line is not None:
@@ -469,7 +484,8 @@ class MapParser:
             meta_parts, line_number)
         return Connection(zone_a_obj, zone_b_obj, max_link_capacity)
 
-    def parse_connection_metadata(self, meta_parts: list[str], line_number: int) -> int:
+    def parse_connection_metadata(self, meta_parts: list[str],
+                                  line_number: int) -> int:
         """Parse the metadata of a connection.
 
         Args:

@@ -93,16 +93,16 @@ Each simulation turn = one line of space-separated `D<id>-<destination>` tokens 
 ## 3. Task List
 
 **Phase 0 — Setup**
-- [ ] Init git repo, `.gitignore`, virtual environment
-- [ ] Scaffold `Makefile` with `install`, `run`, `debug`, `clean`, `lint`, `lint-strict`
-- [ ] Decide project layout (see suggested tree below)
+- [x] Init git repo, `.gitignore`, virtual environment
+- [x] Scaffold `Makefile` with `install`, `run`, `debug`, `clean`, `lint`, `lint-strict`
+- [x] Decide project layout (see suggested tree below)
 
 **Phase 1 — Data model & parser**
-- [ ] Implement `Zone` hierarchy (or enum + cost strategy) with `entry_cost()`
-- [ ] Implement `Connection`, `Graph`
-- [ ] Implement custom parser exceptions with line/cause reporting
-- [ ] Implement parser: read `nb_drones`, zones, connections; validate types, duplicate connections, undefined zone refs, malformed metadata
-- [ ] Write your own extra test map files (edge cases: missing start/end, blocked start, self-loop connection, unknown zone type, duplicate names)
+- [x] Implement `Zone` hierarchy (or enum + cost strategy) with `entry_cost()`
+- [x] Implement `Connection`, `Graph`
+- [x] Implement custom parser exceptions with line/cause reporting
+- [x] Implement parser: read `nb_drones`, zones, connections; validate types, duplicate connections, undefined zone refs, malformed metadata
+- [x] Write your own extra test map files (edge cases: missing start/end, blocked start, self-loop connection, unknown zone type, duplicate names)
 
 **Phase 2 — Single-drone pathfinding**
 - [ ] Implement Dijkstra over your `Graph` (respecting `blocked` as impassable, `restricted`=2, `normal`/`priority`=1)

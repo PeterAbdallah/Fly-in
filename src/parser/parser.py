@@ -1,4 +1,5 @@
 from models.graph import Graph
+from solving.dijkstra import shortest_path
 from models.zone import (Zone, NormalZone,
                          RestrictedZone, PriorityZone, BlockedZone)
 from models.connection import Connection
@@ -85,7 +86,12 @@ class MapParser:
                     raise ParseError(0, "Start_hub not specified")
                 if self.graph.end is None:
                     raise ParseError(0, "End_hub not specified")
-            return ParsedMap(self.graph, self.nb_drones)
+                path = shortest_path(
+                    self.graph, self.graph.start, self.graph.end)
+                if not path:
+                    raise ParseError(
+                        0, "No path exists between start and end.")
+                return ParsedMap(self.graph, self.nb_drones)
         except (FileNotFoundError, PermissionError, OSError) as e:
             raise ParseError(0, str(e))
 

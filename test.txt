@@ -2,12 +2,13 @@
 # kousa
 nb_drones: 5
 
-start_hub: 5 0 1 [zone=priority  color=green]
-hub: waypoint1 1 0 [zone=priority color=blue max_drones=2]
-hub: waypoint2 2 0 [color=blue]
+start_hub: start 0 1 [zone=priority  color=green]
+hub: A 1 0 [color=blue max_drones=2]
+hub: B 2 0 [color=blue zone=restricted]
 end_hub: goal 3 0 [color=red] #inline comment
 
 
-connection: goal-waypoint1 [max_link_capacity=2]
-connection: waypoint1-waypoint2
-connection: waypoint2-goal
+connection: start-A [max_link_capacity=2]
+connection: start-B
+connection: B-goal
+connection: A-goal

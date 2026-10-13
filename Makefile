@@ -1,6 +1,6 @@
 PYTHON = python3
 PIP = $(PYTHON) -m pip
-MAIN = main.py
+MAIN = src/main.py
 REQUIREMENTS = requirements.txt
 
 .PHONY: install run debug clean lint lint-strict

@@ -1,10 +1,15 @@
-from models.zone import Zone
+from src.models.zone import Zone
 
 
 class Connection():
     """Represent a bidirectional connection (edge) between two zones."""
 
-    def __init__(self, zone_a: Zone, zone_b: Zone, max_link_capacity: int):
+    def __init__(
+            self,
+            zone_a: Zone,
+            zone_b: Zone,
+            max_link_capacity: int
+    ) -> None:
         """Initialize the connection between two zones.
 
         Args:
@@ -16,6 +21,15 @@ class Connection():
         self.zone_a = zone_a
         self.zone_b = zone_b
         self.max_link_capacity = max_link_capacity
+
+    @property
+    def name(self) -> str:
+        """Return the connection name, e.g. "start-waypoint1".
+
+        Used as the key in the reservation table and in the output of
+        drones that are in flight toward a restricted zone.
+        """
+        return f"{self.zone_a.name}-{self.zone_b.name}"
 
     def other(self, zone: Zone) -> Zone:
         """Return the zone at the opposite end of this connection.

@@ -5,7 +5,8 @@ class ParseError(Exception):
         """Initialize the error with the offending line and a message.
 
         Args:
-            line_num: The line number in the input file where the error occurred.
+            line_num: The line number in the input
+            file where the error occurred.
             message: A human-readable description of what went wrong.
         """
         self.line_num = line_num
@@ -28,7 +29,7 @@ class DuplicateZoneError(MapError):
         Args:
             zoneName: The name of the zone that was already defined.
         """
-        super().__init__(f"Duplicate zone (name or coordinate)")
+        super().__init__("Duplicate zone (name or coordinate)")
         # This will be the message in the ParseError
 
 
@@ -80,7 +81,7 @@ class SameZoneConnectionError(MapError):
 
     def __init__(self) -> None:
         """Initialize the error with a fixed, descriptive message."""
-        super().__init__(f"A zone cannot be connected to itself!")
+        super().__init__("A zone cannot be connected to itself!")
 
 
 class DuplicateConnectionError(MapError):
@@ -88,4 +89,4 @@ class DuplicateConnectionError(MapError):
 
     def __init__(self) -> None:
         """Initialize the error with a fixed, descriptive message."""
-        super().__init__(f"A connection like this already exists.")
+        super().__init__("A connection like this already exists.")

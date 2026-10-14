@@ -1,7 +1,7 @@
 import heapq
 
-from models.graph import Graph
-from models.zone import Zone, PriorityZone, BlockedZone
+from src.models.graph import Graph
+from src.models.zone import Zone, PriorityZone, BlockedZone
 
 
 def shortest_path(graph: Graph, start: Zone, end: Zone) -> list[Zone] | None:

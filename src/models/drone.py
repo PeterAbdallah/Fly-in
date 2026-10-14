@@ -1,4 +1,4 @@
-from models.zone import Zone
+from src.models.zone import Zone
 from enum import Enum
 
 

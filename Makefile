@@ -1,6 +1,6 @@
 PYTHON = python3
 PIP = $(PYTHON) -m pip
-MAIN = src/main.py
+MAIN = src.main
 REQUIREMENTS = requirements.txt
 
 .PHONY: install run debug clean lint lint-strict
@@ -9,7 +9,7 @@ install:
 	$(PIP) install -r $(REQUIREMENTS)
 
 run:
-	$(PYTHON) $(MAIN)
+	$(PYTHON) -m $(MAIN)
 
 debug:
 	$(PYTHON) -m pdb $(MAIN)
@@ -21,9 +21,9 @@ clean:
 	rm -rf .mypy_cache .pytest_cache .coverage
 
 lint:
-	flake8 .
-	mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+	flake8 src/ --exclude=.venv
+	mypy src/ --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
 
 lint-strict:
-	flake8 .
-	mypy . --strict
+	flake8 src/ --exclude=.venv
+	mypy src/ --strict

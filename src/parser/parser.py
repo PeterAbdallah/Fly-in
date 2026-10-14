@@ -1,9 +1,9 @@
-from models.graph import Graph
-from solving.dijkstra import shortest_path
-from models.zone import (Zone, NormalZone,
-                         RestrictedZone, PriorityZone, BlockedZone)
-from models.connection import Connection
-from parser.errors import ParseError, MapError
+from src.models.graph import Graph
+from src.solving.dijkstra import shortest_path
+from src.models.zone import (Zone, NormalZone,
+                             RestrictedZone, PriorityZone, BlockedZone)
+from src.models.connection import Connection
+from src.parser.errors import ParseError, MapError
 import re
 
 
@@ -253,7 +253,7 @@ class MapParser:
         if meta_line is not None:
             meta_parts: list[str] = meta_line.split()
         else:
-            meta_parts: list[str] = list()
+            meta_parts = list()
 
         if len(parts) != 3:
             raise ParseError(
@@ -474,7 +474,7 @@ class MapParser:
                     line_number,
                     "Metadata can only contain 'max_link_capacity'.")
         else:
-            meta_parts: list[str] = list()
+            meta_parts = list()
 
         if zone_a not in self.graph.zones or zone_b not in self.graph.zones:
             raise ParseError(

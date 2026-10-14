@@ -1,6 +1,6 @@
-from models.zone import Zone
-from models.connection import Connection
-import parser.errors as errors
+from src.models.zone import Zone
+from src.models.connection import Connection
+import src.parser.errors as errors
 
 
 class Graph:

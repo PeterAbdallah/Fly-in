@@ -1,3 +1,6 @@
+"""Search timed routes and reserve the final route chosen for each drone."""
+
+# A heap always removes the smallest tuple, giving the earliest turn first.
 import heapq
 
 from src.models.connection import Connection
@@ -5,6 +8,8 @@ from src.models.graph import Graph
 from src.models.zone import BlockedZone, PriorityZone, Zone
 from src.solving.reservation_table import ReservationTable
 
+# Different turns in the same zone are different search states. Therefore a
+# path may wait in a zone or return later without repeating a timed state.
 State = tuple[str, int]  # (zone name, turn)
 
 
@@ -31,85 +36,111 @@ def plan_drone(
         The list of (zone name, turn) states from start to end, or None
         if no valid path was found.
     """
-    # turn, neg_priority, name
+    # Compare (arrival turn, negative priority count, zone name) left to right.
+    # Negating the count makes MORE priority entries sort before fewer entries.
+    # Names settle final ties consistently without comparing Zone objects.
+    # Move count is NOT part of this score: equally fast routes can keep a
+    # forward/backward detour instead of waiting. Loops are allowed.
     heap: list[tuple[int, int, str]] = []
-    # (zone, turn) with highest priority
+    # For each (zone, turn), retain the best negative priority score found.
     best: dict[State, int] = {}
+    # Previous-state links let us reconstruct only the chosen route at the end.
     came_from: dict[State, State] = {}
+    # Finalized states need not be expanded again, even if still in the heap.
     done: set[State] = set()
 
+    # Every drone begins at turn zero. Delayed departures are planned as waits.
     first: State = (start.name, 0)
     best[first] = 0
     heapq.heappush(heap, (0, 0, start.name))
 
     while heap:
-        # Step 6
+        # Explore the earliest queued state. Heap order resolves score ties.
         turn, neg_prio, name = heapq.heappop(heap)
         state: State = (name, turn)
         if state in done:
             continue
         done.add(state)
 
-        # Step 7
         if name == end.name:
+            # Build the full fixed path before the simulation starts moving.
             return _rebuild(came_from, first, state)
 
-        # Step 8
         if turn >= max_turn:
+            # Stop expanding this branch so the time-expanded search is finite.
             continue
 
         current: Zone = graph.get_zone(name)
 
-        # Step 9: collect every valid (zone, arrival turn) option
+        # Collect feasible waits/moves first, then update search scores below.
         options: list[tuple[Zone, int]] = []
 
         if table.zone_has_room(current, turn + 1):
-            options.append((current, turn + 1))          # wait
+            # Waiting occupies this same zone at the next turn, without a link.
+            options.append((current, turn + 1))
 
+        # Undirected connections allow both forward and backward travel.
         for connection in graph.get_neighbors(current):
             neighbor = connection.other(current)
+
             if isinstance(neighbor, BlockedZone):
+                # Check the type before entry_cost(), which raises for blocked.
                 continue
+
             arrival: int = turn + neighbor.entry_cost()
+            # Normal/priority entry takes one turn; restricted entry takes two.
+            # Only the arrival turn occupies the destination zone.
             if not table.zone_has_room(neighbor, arrival):
                 continue
-            # The link is used on every turn of the trip (1 or 2 turns)
+
+            # Check every travel turn INCLUDING arrival, matching reserve_path.
+            # Without +1 the range is empty for a normal one-turn move.
             link_free = all(
                 table.link_has_room(connection, t)
                 for t in range(turn + 1, arrival + 1)
             )
             if link_free:
-                options.append((neighbor, arrival))      # move
+                options.append((neighbor, arrival))
 
-        # Step 10
         for zone, arrival in options:
             new_state: State = (zone.name, arrival)
+            # Entering a priority zone earns a bonus; waiting there does not.
+            # Re-entering it later earns another bonus under the current score,
+            # which can also favor some loops when final arrival times tie.
             bonus = 1 if (
                 zone.name != name and isinstance(zone, PriorityZone)
             ) else 0
             new_neg = neg_prio - bonus
             if new_state in best and best[new_state] <= new_neg:
+                # Equal scores retain the FIRST discovered route. There is no
+                # preference for fewer moves, so a later equal waiting route
+                # does not replace an already recorded out-and-back route.
                 continue
             best[new_state] = new_neg
+            # Saving the predecessor here fixes which equal-score route wins.
             came_from[new_state] = state
             heapq.heappush(heap, (arrival, new_neg, zone.name))
 
-    return None  # Step 11: heap empty, no schedule found
+    return None  # heap empty, end not reached
 
 
 def _rebuild(
     came_from: dict[State, State], first: State, last: State
 ) -> list[State]:
     """Follow came_from backwards from the last state to the first."""
+    # This walks the SEARCH HISTORY backwards, not the drone during playback.
     states: list[State] = [last]
     while states[-1] != first:
         states.append(came_from[states[-1]])
     states.reverse()
+    # Return chronological order so the first state is always (start, 0).
     return states
 
 
 def _find_connection(graph: Graph, zone_a: Zone, zone_b: Zone) -> Connection:
     """Return the connection between two adjacent zones."""
+    # Looking up the actual undirected object keeps both directions on the
+    # same capacity counter and uses its stored name in restricted-flight logs.
     for connection in graph.get_neighbors(zone_a):
         if connection.other(zone_a) == zone_b:
             return connection
@@ -126,12 +157,17 @@ def reserve_path(
         table: The table to update.
         states: The path returned by plan_drone.
     """
+    # zip with a one-state offset gives every consecutive action in the route.
+    # Reserve only the chosen path. Trial branches book no capacity.
     for (name_a, turn_a), (name_b, turn_b) in zip(states, states[1:]):
         zone_b = graph.get_zone(name_b)
         if name_a != name_b:  # a move, not a wait
             connection = _find_connection(
                 graph, graph.get_zone(name_a), zone_b
             )
+            # A restricted move occupies the connection for both travel turns.
             for t in range(turn_a + 1, turn_b + 1):
                 table.reserve_link(connection, t)
+        # Both a wait and a move occupy the arrival zone on their final turn.
+        # The table itself exempts start/end from zone-capacity limits.
         table.reserve_zone(zone_b, turn_b)

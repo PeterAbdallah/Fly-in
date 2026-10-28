@@ -44,7 +44,7 @@ Use **Python 3.10 or newer**, with `venv` and `pip` available. Run the following
    python3 src/main.py
    ```
 
-   The visualizer opens paused. Press **Space** or click **Play** to start.
+   The visualizer opens paused. Press **Space** to start.
 
 For later sessions, activate the existing environment before running the program. Use `deactivate` when finished.
 
@@ -97,13 +97,13 @@ python3 -m pdb src/main.py
 
 `MapParser` reads the drone count, zones, optional metadata, and bidirectional connections. It ignores comments and empty lines, validates the input, and reports parsing errors with their line and cause. It also checks whether the end is reachable.
 
-`Graph` stores zones by name and keeps an adjacency list of connections. Zone subclasses implement their entry costs. `Drone` stores its identifier, position, state, and complete timed path. `Simulation` coordinates planning and playback, while `PygameVisualizer` handles the display and input.
+`Graph` stores zones by name and keeps an adjacency list of connections. Zone subclasses implement their entry costs. `Drone` stores its identifier, current zone or connection, and complete timed path. Its position identifies transit and delivery without a separate status field. `Simulation` coordinates planning and playback, while `PygameVisualizer` handles the display and input.
 
-### 2. Compute a static route cost
+### 2. Check reachability with Dijkstra
 
 `shortest_path()` uses Dijkstra's algorithm with Python's `heapq`. Moving into a zone adds that destination's entry cost. Blocked zones are skipped, and equal-cost routes prefer more priority-zone entries.
 
-The resulting route provides a base travel cost, `C`. This is a bound for later searches; drones are not forced to use this one route.
+The parser uses this static route to check that the end can be reached. Drones are not forced to use this one route: the timed planner searches separately for each drone.
 
 ### 3. Search a timed route for each drone
 
@@ -122,13 +122,13 @@ The heap compares arrival turn first, then negative priority-entry count, then z
 
 Planning is sequential, but the resulting travel is simultaneous: several drones can move on the same turn when capacities allow it. Earlier routes remain fixed while later drones are planned.
 
-If the latest planned arrival is `T`, the next search uses a horizon of `T + C`. A feasible fallback is to wait at the unlimited start until earlier drones finish, then follow the static route. This adapts the horizon to the fleet instead of imposing a fixed 500-turn limit during simulation planning.
+The current simulation uses the planner's default search horizon of 500 turns. If a larger map or fleet requires a longer schedule, adjust the `max_turn` argument passed to `plan_drone()` in `Simulation.plan()`.
 
 ### 5. Play back the fixed paths
 
-`Simulation.prepare()` plans all routes and resets the fleet to turn zero. `step()` advances exactly one turn, updates waiting, moving, in-transit, and delivered states, and returns that turn's movement line. `run()` combines preparation and stepping for terminal execution.
+Each new `Simulation` starts with fresh drones at the start zone and turn zero. `plan()` calculates their routes. `step()` advances exactly one turn, updates each drone's current zone or connection, and returns that turn's movement line. A drone at the end zone is considered delivered. After planning, `run()` prints successive steps for terminal execution.
 
-Playback follows the stored paths without live rerouting. Restarting prepares the simulation again. The visualizer interpolates between real positions for smooth animation; animation does not change movement rules or reservations.
+Playback follows the stored paths without live rerouting. To repeat a simulation, close the window and launch the program again. The visualizer draws a half-second glide between the previous and current turn's positions; this animation does not change the simulation's routes or timing.
 
 ### Current optimization limits
 
@@ -148,25 +148,19 @@ The graph is shared across searches. Each drone's route is computed during prepa
 
 ## Visualization
 
-The resizable Pygame window draws zones at their map coordinates and connects them with edges. Recognized map colors fill the nodes; outlines and markers distinguish start, end, priority, restricted, and blocked zones. Unknown color names use a fallback.
+The basic Pygame window shows colored circles for zones, gray lines for connections, and small quadcopter icons for drones. Each drone icon has four rotors and a yellow body. The map is scaled to fit the window automatically. Unknown map color names fall back to gray.
 
-Drone icons move between their planned positions. Restricted-transit drones appear halfway along their connection on the intermediate turn. Crowded positions use a small group of icons and a badge showing the full drone count. Dense maps hide overlapping labels, while hovering reveals zone details.
+Restricted-transit drones appear halfway along their connection for the intermediate turn. A number beside an icon counts drones sharing that position. Delivered drones disappear. Maps with more than 15 zones show only the start and end names to reduce overlapping labels.
 
-The sidebar shows the current turn, total planned turns, delivered count, waiting and in-transit counts, and a zone inspector with coordinates, capacity, occupancy, color, and drone identifiers. These views help explain bottlenecks, waiting, and two-turn travel. Pause and single-step controls make individual turns easier to inspect, while zoom and pan keep larger maps readable.
+The header shows the current turn, total turns, delivered drones, and playback status. Playback advances once per second. Pausing and advancing a single turn make it easier to follow waiting and restricted-zone travel.
 
-| Control                         | Action                                                                |
-| ------------------------------- | --------------------------------------------------------------------- |
-| Space / Play button             | Play or pause; playing after completion restarts the simulation.      |
-| Right arrow / Step button       | Advance one turn and pause.                                           |
-| R / Restart button              | Reset the simulation to turn zero, paused.                            |
-| Up / Down arrows                | Increase or decrease playback speed, from 0.25 to 8 turns per second. |
-| Mouse wheel over the map        | Zoom around the cursor.                                               |
-| Hold left mouse button and drag | Pan the map.                                                          |
-| F / Fit map button              | Fit the complete map in the canvas.                                   |
-| Hover over a zone               | Inspect its details in the sidebar.                                   |
-| Escape / Window close button    | Close the visualizer.                                                 |
+| Control | Action |
+| --- | --- |
+| Space | Play or pause. |
+| Right arrow | Advance one turn and pause. |
+| Escape / Window close button | Close the visualizer. |
 
-After all deliveries, the window stays open for inspection or restart. Terminal-only mode retains the movement log without opening Pygame.
+After all deliveries, the window stays open for inspection. Close and run the program again to replay. Terminal-only mode retains the movement log without opening Pygame.
 
 ## Resources
 

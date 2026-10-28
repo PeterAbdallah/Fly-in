@@ -1,3 +1,5 @@
+"""Plan drone routes and play them through terminal or graphical views."""
+
 from src.models.drone import Drone
 from src.models.zone import Zone
 from src.parser.parser import ParsedMap
@@ -6,7 +8,10 @@ from src.solving.reservation_table import ReservationTable
 
 
 class Simulation:
+    """Keep planning and drone position updates independent of drawing."""
+
     def __init__(self, map: ParsedMap) -> None:
+        """Create the fleet and shared reservations from a parsed map."""
         self.map: ParsedMap = map
         start = map.graph.start
         end = map.graph.end
@@ -22,6 +27,7 @@ class Simulation:
         self.total_turns: int = 0
 
     def plan(self) -> None:
+        """Plan every drone and reserve each route before playback."""
         for drone in self.drones:
             # Get drone path
             path = plan_drone(
@@ -48,45 +54,55 @@ class Simulation:
                 path[-1][1]
             )
 
-    def run(self) -> None:
-        for turn in range(1, self.total_turns + 1):
-            movements: list[str] = []
+    def step(self) -> str | None:
+        """Advance one turn and return its movements, or None when finished."""
+        if self.turn >= self.total_turns:
+            return None
 
-            for drone in self.drones:
-                path: list[tuple[str, int]] | None = drone.path
+        self.turn += 1
+        movements: list[str] = []
+        for drone in self.drones:
+            path = drone.path
+            if path is None:
+                raise ValueError(
+                    f"D{drone.drone_id} has no path. Call plan() first."
+                )
 
-                if path is None:
-                    raise ValueError(
-                        f"D{drone.drone_id} has no path. Call plan() first."
+            for i in range(1, len(path)):
+                name_a, turn_a = path[i - 1]
+                name_b, turn_b = path[i]
+                if not turn_a < self.turn <= turn_b:
+                    continue
+
+                # wait
+                if name_a == name_b:
+                    drone.current_zone = self.map.graph.get_zone(name_b)
+                    drone.current_connection = None
+
+                # moving to restricted, standing on connection
+                elif self.turn < turn_b:
+                    connection = _find_connection(
+                        self.map.graph,
+                        self.map.graph.get_zone(name_a),
+                        self.map.graph.get_zone(name_b)
                     )
+                    drone.current_zone = None
+                    drone.current_connection = connection
+                    movements.append(f"D{drone.drone_id}-{connection.name}")
 
-                for i in range(1, len(path)):
-                    name_a, turn_a = path[i - 1]
-                    name_b, turn_b = path[i]
+                # Arrived to destination
+                elif self.turn == turn_b:
+                    zone = self.map.graph.get_zone(name_b)
+                    drone.current_zone = zone
+                    drone.current_connection = None
+                    movements.append(f"D{drone.drone_id}-{name_b}")
+                break
+        return " ".join(movements)
 
-                    # Drone is waiting
-                    if name_a == name_b:
-                        continue
-
-                    # Drone is traveling between two zones
-                    if turn_a < turn < turn_b:
-                        connection = _find_connection(
-                            self.map.graph,
-                            self.map.graph.get_zone(name_a),
-                            self.map.graph.get_zone(name_b)
-                        )
-
-                        movements.append(
-                            f"D{drone.drone_id}-{connection.name}"
-                        )
-                        break
-
-                    # Drone arrives at the destination zone
-                    if turn == turn_b:
-                        movements.append(
-                            f"D{drone.drone_id}-{name_b}"
-                        )
-                        break
-
-            if movements:
-                print(" ".join(movements))
+    def run(self) -> None:
+        """Play positions in the terminal using the same steps as the GUI."""
+        while True:
+            movements = self.step()
+            if movements is None:
+                return
+            print(movements)

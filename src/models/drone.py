@@ -1,4 +1,5 @@
 from src.models.zone import Zone
+from src.models.connection import Connection
 from enum import Enum
 
 
@@ -21,6 +22,8 @@ class Drone():
             drone_id: The drone's unique identifier.
             current_zone: The zone the drone currently occupies.
         """
-        self.drone_id = drone_id
-        self.current_zone = current_zone
+        self.drone_id: int = drone_id
         self.state: DroneState = DroneState.WAITING
+        self.current_zone: Zone | None = current_zone
+        self.current_connection: Connection | None = None
+        self.path: list[tuple[str, int]] | None = None

@@ -12,11 +12,8 @@ class ReservationTable:
             start: The start zone (unlimited capacity).
             end: The end zone (unlimited capacity).
         """
-        # (zone name, turn) -> number of drones in that zone at that turn
         self._zone_usage: dict[tuple[str, int], int] = {}
-        # (connection name, turn) -> number of drones on that connection
         self._link_usage: dict[tuple[str, int], int] = {}
-        # Start and end have no capacity limit, so they are never counted.
         self._unlimited: set[str] = {start.name, end.name}
 
     def zone_has_room(self, zone: Zone, turn: int) -> bool:

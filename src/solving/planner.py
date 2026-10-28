@@ -43,24 +43,20 @@ def plan_drone(
     heapq.heappush(heap, (0, 0, start.name))
 
     while heap:
-        # Step 6
         turn, neg_prio, name = heapq.heappop(heap)
         state: State = (name, turn)
         if state in done:
             continue
         done.add(state)
 
-        # Step 7
         if name == end.name:
             return _rebuild(came_from, first, state)
 
-        # Step 8
         if turn >= max_turn:
             continue
 
         current: Zone = graph.get_zone(name)
 
-        # Step 9: collect every valid (zone, arrival turn) option
         options: list[tuple[Zone, int]] = []
 
         if table.zone_has_room(current, turn + 1):
@@ -73,7 +69,7 @@ def plan_drone(
             arrival: int = turn + neighbor.entry_cost()
             if not table.zone_has_room(neighbor, arrival):
                 continue
-            # The link is used on every turn of the trip (1 or 2 turns)
+
             link_free = all(
                 table.link_has_room(connection, t)
                 for t in range(turn + 1, arrival + 1)
@@ -81,7 +77,6 @@ def plan_drone(
             if link_free:
                 options.append((neighbor, arrival))      # move
 
-        # Step 10
         for zone, arrival in options:
             new_state: State = (zone.name, arrival)
             bonus = 1 if (
@@ -117,18 +112,18 @@ def _find_connection(graph: Graph, zone_a: Zone, zone_b: Zone) -> Connection:
 
 
 def reserve_path(
-    graph: Graph, table: ReservationTable, states: list[State]
+    graph: Graph, table: ReservationTable, path: list[State]
 ) -> None:
     """Write a finished plan into the reservation table.
 
     Args:
         graph: The graph the plan was made on.
         table: The table to update.
-        states: The path returned by plan_drone.
+        path: The path returned by plan_drone.
     """
-    for (name_a, turn_a), (name_b, turn_b) in zip(states, states[1:]):
+    for (name_a, turn_a), (name_b, turn_b) in zip(path, path[1:]):
         zone_b = graph.get_zone(name_b)
-        if name_a != name_b:  # a move, not a wait
+        if name_a != name_b:
             connection = _find_connection(
                 graph, graph.get_zone(name_a), zone_b
             )
